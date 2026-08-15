@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ tokens */
+@theme {
+  /* Surfaces climb from near-black; nothing is pure #000 so glow has somewhere to sit. */
+  --color-void: #08090a;
+  --color-surface: #0e1113;
+  --color-raised: #14181b;
+  --color-line: #1e2429;
+  --color-line-strong: #2b3339;
+
+  --color-ink: #e9edf0;
+  --color-ink-soft: #b3bcc4;
+  --color-muted: #7e8891;
+  --color-faint: #565f67;
+
+  --color-amber: #ffb020;
+  --color-amber-soft: #ffc65c;
+  --color-amber-dim: #6b4a0f;
+
+  --color-good: #3fb950;
+  --color-warn: #d29922;
+  --color-bad: #f85149;
+
+  /* Codeforces-derived progression. Used only by rank components. */
+  --color-rank-newbie: #9aa3ab;
+  --color-rank-pupil: #3fb950;
+  --color-rank-specialist: #24b8c4;
+  --color-rank-expert: #3d7dff;
+  --color-rank-cm: #a855f7;
+  --color-rank-master: #ff8c1a;
+  --color-rank-gm: #f0323c;
+
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 0.625rem;
+}
+
+/* ------------------------------------------------------------------- base */
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05", "ss01";
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Data and display type is monospace; prose is not. */
+  .font-data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background: var(--color-amber-dim);
+    color: var(--color-ink);
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+
+/* --------------------------------------------------------------- utilities */
+@utility card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+@utility hairline-grid {
+  background-image:
+    linear-gradient(var(--color-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 20%, transparent 78%);
+}
+
+/* The one piece of glow in the system, reserved for rank. */
+@utility rank-glow {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--rank-color) 35%, transparent),
+    0 0 32px -8px color-mix(in srgb, var(--rank-color) 55%, transparent);
+}
+
+/* Terminal identity layer: a caret that idles, never a green screen. */
+@keyframes caret {
+  0%, 45% { opacity: 1; }
+  46%, 100% { opacity: 0; }
+}
+
+.caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1.05em;
+  margin-left: 0.15em;
+  vertical-align: -0.15em;
+  background: var(--color-amber);
+  animation: caret 1.15s steps(1) infinite;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.rise {
+  animation: rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

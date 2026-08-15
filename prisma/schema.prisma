@@ -1,0 +1,564 @@
+// ~/consistency — data model
+// Design rules enforced here:
+//  1. Personal progression and SYNC progression are physically separate tables.
+//     A SYNC completion can never be counted toward a personal streak or rank.
+//  2. Every completion row is owned by exactly one user. No shared completion rows.
+//  3. Dates are stored as @db.Date holding the user's LOCAL calendar day, never UTC instants.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- enums
+
+enum TaskCategory {
+  DSA
+  SQL
+  ML
+  HEALTH
+  CUSTOM
+}
+
+enum DayType {
+  DAILY
+  WEEKDAY
+  SATURDAY
+  SUNDAY
+  /// Lands on one specific date only. Requires scheduledDate.
+  ONE_OFF
+}
+
+/// Why a day was missed. Recorded for the user's own pattern-spotting and
+/// deliberately has NO effect on rating: a reason is not an excuse.
+enum MissReason {
+  SICK
+  TRAVEL
+  OVERLOADED
+  LOW_ENERGY
+  CHOSE_NOT_TO
+  OTHER
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum SyncMemberStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+  LEFT
+  REMOVED
+}
+
+enum RankTier {
+  NEWBIE
+  PUPIL
+  SPECIALIST
+  EXPERT
+  CANDIDATE_MASTER
+  MASTER
+  GRANDMASTER
+}
+
+enum ScheduleSource {
+  INTERNAL
+  IMPORTED
+}
+
+enum CalendarStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+}
+
+enum RecordType {
+  LONGEST_STREAK
+  BEST_WEEK
+  BEST_MONTH
+  MOST_PERFECT_DAYS
+  MOST_TASKS_IN_DAY
+  MOST_DSA_IN_WEEK
+  HIGHEST_STEPS
+  EARLIEST_WAKE
+  HIGHEST_CONSISTENCY
+  LONGEST_FOCUS_SESSION
+}
+
+// ---------------------------------------------------------------- user
+
+model User {
+  id           String  @id @default(cuid())
+  username     String  @unique
+  passwordHash String
+  email        String? @unique
+  displayName  String
+
+  timezone     String @default("Asia/Kolkata")
+  stepGoal     Int    @default(10000)
+  wakeGoalTime String @default("04:00") // local HH:mm
+
+  // Cached progression. Single source of truth is lib/rank.ts, which recomputes
+  // these from DailySnapshot. Never written ad hoc from a route handler.
+  rating        Int      @default(0)
+  tier          RankTier @default(NEWBIE)
+  xp            Int      @default(0)
+  currentStreak Int      @default(0)
+  longestStreak Int      @default(0)
+
+  /// Members of a SYNC can send at most one nudge per day. Off means none.
+  allowNudges     Boolean   @default(true)
+
+  // Email reminders. Off until the user turns them on and has an address.
+  reminderEnabled Boolean   @default(false)
+  reminderTime    String    @default("20:00") // local HH:mm
+  lastReminderAt  DateTime?
+
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tasks             Task[]             @relation("TaskOwner")
+  authoredTasks     Task[]             @relation("TaskAuthor")
+  taskLogs          TaskLog[]
+  syncTaskLogs      SyncTaskLog[]
+  metrics           DailyMetric[]
+  snapshots         DailySnapshot[]
+  focusSessions     FocusSession[]
+  achievements      UserAchievement[]
+  rankHistory       RankHistory[]
+  records           PersonalRecord[]
+  sentRequests      Friendship[]       @relation("Requester")
+  receivedRequests  Friendship[]       @relation("Addressee")
+  ownedSyncs        Sync[]             @relation("SyncOwner")
+  memberships       SyncMembership[]   @relation("Member")
+  sentInvites       SyncMembership[]   @relation("Inviter")
+  authoredSyncTasks SyncTask[]
+  goalProgress      SyncGoalProgress[]
+  scheduleBlocks    ScheduleBlock[]
+  nudgesSent        Nudge[]              @relation("NudgeFrom")
+  nudgesReceived    Nudge[]              @relation("NudgeTo")
+  calendarLinks     CalendarConnection[]
+  resetTokens       PasswordResetToken[]
+  restDays          RestDay[]
+
+  @@index([lastActiveAt])
+}
+
+// ---------------------------------------------------------------- personal tasks
+
+model Task {
+  id              String       @id @default(cuid())
+  name            String
+  category        TaskCategory
+  /// Free-text label used only when category is CUSTOM, e.g. "Guitar".
+  customLabel     String?
+  dayType         DayType      @default(DAILY)
+  /// Set only for ONE_OFF tasks: the single local day they apply to.
+  scheduledDate   DateTime?    @db.Date
+  ownerUserId     String
+  createdByUserId String
+  isCore          Boolean      @default(true)
+  isActive        Boolean      @default(true)
+  sortOrder       Int          @default(0)
+  createdAt       DateTime     @default(now())
+  archivedAt      DateTime? // archive, never hard delete
+
+  owner     User           @relation("TaskOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  createdBy User           @relation("TaskAuthor", fields: [createdByUserId], references: [id])
+  logs      TaskLog[]
+  sessions  FocusSession[]
+  schedule  ScheduleBlock[]
+
+  @@index([ownerUserId, isActive, sortOrder])
+}
+
+model TaskLog {
+  id          String    @id @default(cuid())
+  taskId      String
+  userId      String
+  date        DateTime  @db.Date // user's local calendar day
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  /// Optional proof: a commit, a submission, a photo. Never required.
+  evidenceUrl String?
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId, date])
+  @@index([userId, date])
+}
+
+// ---------------------------------------------------------------- daily metrics & rollups
+
+model DailyMetric {
+  id           String   @id @default(cuid())
+  userId       String
+  date         DateTime @db.Date
+  steps        Int?
+  stepGoalMet  Boolean  @default(false)
+  wokeUpOnTime Boolean  @default(false)
+  wakeTime     String? // local HH:mm
+  notes        String?
+  missReason   MissReason?
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+/// Per-day rollup written by the progression engine. Powers the heatmap,
+/// momentum, consistency score and analytics without re-aggregating raw logs.
+model DailySnapshot {
+  id             String   @id @default(cuid())
+  userId         String
+  date           DateTime @db.Date
+  coreTotal      Int      @default(0)
+  coreCompleted  Int      @default(0)
+  bonusCompleted Int      @default(0)
+  completionPct  Float    @default(0) // 0..1, core tasks only
+  perfectDay     Boolean  @default(false)
+  stepGoalMet    Boolean  @default(false)
+  wakeGoalMet    Boolean  @default(false)
+  xpEarned       Int      @default(0)
+  ratingDelta    Int      @default(0)
+  ratingAfter    Int      @default(0)
+  streakAfter    Int      @default(0)
+  computedAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+// ---------------------------------------------------------------- progression records
+
+model RankHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  fromTier  RankTier?
+  toTier    RankTier
+  rating    Int
+  isPromo   Boolean  @default(true)
+  changedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, changedAt])
+}
+
+model PersonalRecord {
+  id         String     @id @default(cuid())
+  userId     String
+  type       RecordType
+  value      Float
+  label      String?
+  occurredAt DateTime
+  updatedAt  DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+}
+
+model Achievement {
+  id          String @id @default(cuid())
+  code        String @unique
+  name        String
+  description String
+  icon        String?
+  sortOrder   Int    @default(0)
+
+  unlocks UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+model FocusSession {
+  id             String       @id @default(cuid())
+  userId         String
+  taskId         String?
+  label          String
+  category       TaskCategory @default(CUSTOM)
+  plannedMinutes Int
+  elapsedSeconds Int          @default(0)
+  startedAt      DateTime     @default(now())
+  endedAt        DateTime?
+  completed      Boolean      @default(false)
+  xpAwarded      Int          @default(0)
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+}
+
+/// A planned block of time on a given local day. Minutes are local-midnight
+/// offsets (0–1440), never instants, so a timezone change can't shift a plan.
+model ScheduleBlock {
+  id          String          @id @default(cuid())
+  userId      String
+  date        DateTime        @db.Date
+  startMinute Int
+  endMinute   Int
+  title       String
+  taskId      String?
+  source      ScheduleSource  @default(INTERNAL)
+  /// Set only for blocks that came from an external provider. Never invented.
+  externalId  String?
+  provider    String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, provider, externalId])
+  @@index([userId, date])
+}
+
+/// The integration boundary. A row here records intent and status only — no
+/// tokens are stored and no synchronisation is simulated (PRD §53).
+model CalendarConnection {
+  id                 String         @id @default(cuid())
+  userId             String
+  provider           String
+  status             CalendarStatus @default(DISCONNECTED)
+  externalCalendarId String?
+  lastSyncedAt       DateTime?
+  createdAt          DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+/// A rest day declared IN ADVANCE. Scheduling Sunday off is a plan; forgiving
+/// yesterday is an excuse, so the server refuses anything inside 24 hours.
+model RestDay {
+  id         String   @id @default(cuid())
+  userId     String
+  date       DateTime @db.Date
+  note       String?
+  declaredAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model Quote {
+  id       String  @id @default(cuid())
+  text     String
+  author   String?
+  category String?
+}
+
+// ---------------------------------------------------------------- social
+
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  respondedAt DateTime?
+
+  requester User @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("Addressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+}
+
+model Sync {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  ownerUserId String
+  /// Season window. A SYNC that runs forever quietly dies, so it gets an end.
+  startDate   DateTime? @db.Date
+  endDate     DateTime? @db.Date
+  createdAt   DateTime @default(now())
+  archivedAt  DateTime?
+
+  owner   User             @relation("SyncOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  members    SyncMembership[]
+  goals      SyncGoal[]
+  tasks      SyncTask[]
+  nudges     Nudge[]
+  milestones SyncMilestone[]
+
+  @@index([ownerUserId])
+}
+
+model SyncMembership {
+  id              String           @id @default(cuid())
+  syncId          String
+  userId          String
+  status          SyncMemberStatus @default(INVITED)
+  invitedByUserId String?
+  invitedAt       DateTime         @default(now())
+  respondedAt     DateTime?
+  leftAt          DateTime?
+
+  sync      Sync  @relation(fields: [syncId], references: [id], onDelete: Cascade)
+  user      User  @relation("Member", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User? @relation("Inviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([syncId, userId])
+  @@index([userId, status])
+}
+
+model SyncGoal {
+  id           String   @id @default(cuid())
+  syncId       String
+  title        String
+  unit         String   @default("days")
+  defaultTarget Int     @default(100)
+  startDate    DateTime @db.Date
+  endDate      DateTime? @db.Date
+  createdAt    DateTime @default(now())
+
+  sync       Sync               @relation(fields: [syncId], references: [id], onDelete: Cascade)
+  progress   SyncGoalProgress[]
+  milestones SyncMilestone[]
+
+  @@index([syncId])
+}
+
+/// Shared direction, individual accountability: one row per member per goal.
+model SyncGoalProgress {
+  id           String   @id @default(cuid())
+  goalId       String
+  userId       String
+  memberTarget Int // may differ from the goal's default target
+  currentValue Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  goal SyncGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, userId])
+}
+
+/// One nudge per sender, per recipient, per SYNC, per day. The unique index is
+/// the rate limit: there is no code path that can send a second one.
+model Nudge {
+  id         String   @id @default(cuid())
+  syncId     String
+  fromUserId String
+  toUserId   String
+  date       DateTime @db.Date
+  createdAt  DateTime @default(now())
+
+  sync Sync @relation(fields: [syncId], references: [id], onDelete: Cascade)
+  from User @relation("NudgeFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to   User @relation("NudgeTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([syncId, fromUserId, toUserId, date])
+  @@index([toUserId, date])
+}
+
+/// Recorded once when the group crosses a threshold, so a milestone can't be
+/// celebrated twice or lost when progress dips back below it.
+model SyncMilestone {
+  id        String   @id @default(cuid())
+  syncId    String
+  goalId    String
+  threshold Int
+  reachedAt DateTime @default(now())
+
+  sync Sync     @relation(fields: [syncId], references: [id], onDelete: Cascade)
+  goal SyncGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, threshold])
+}
+
+model SyncTask {
+  id              String       @id @default(cuid())
+  name            String
+  category        TaskCategory
+  customLabel     String?
+  dayType         DayType      @default(DAILY)
+  scheduledDate   DateTime?    @db.Date
+  syncId          String
+  createdByUserId String
+  isCore          Boolean      @default(true)
+  isActive        Boolean      @default(true)
+  sortOrder       Int          @default(0)
+  createdAt       DateTime     @default(now())
+  archivedAt      DateTime?
+
+  sync      Sync          @relation(fields: [syncId], references: [id], onDelete: Cascade)
+  createdBy User          @relation(fields: [createdByUserId], references: [id])
+  logs      SyncTaskLog[]
+
+  @@index([syncId, isActive, sortOrder])
+}
+
+/// Separate from TaskLog on purpose: SYNC work must never reach the personal
+/// rank/streak engine, and the split makes that impossible to get wrong.
+model SyncTaskLog {
+  id          String    @id @default(cuid())
+  syncTaskId  String
+  userId      String
+  date        DateTime  @db.Date
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+
+  syncTask SyncTask @relation(fields: [syncTaskId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([syncTaskId, userId, date])
+  @@index([userId, date])
+}
+
+// ---------------------------------------------------------------- security
+
+/// Only a SHA-256 hash of the token is stored, so a database leak can't be used
+/// to reset anyone's password. Single use, short lived.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  identifier String // lowercased username
+  ip         String?
+  success    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([identifier, createdAt])
+}

@@ -1,0 +1,248 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { Hero } from "@/components/landing/hero";
+import { SyncPreview } from "@/components/landing/sync-preview";
+import { db } from "@/lib/db";
+import { BACKFILL_DAYS } from "@/lib/progression";
+import { RATING_RULES, TIERS, XP_RULES } from "@/lib/rank";
+import { getCurrentUser } from "@/lib/session";
+
+export const metadata: Metadata = {
+  title: "~/consistency, a personal discipline operating system",
+  description:
+    "Track DSA, SQL, ML, gym and sleep in one place. A Codeforces-style rank you can lose, analytics built only from what you logged, and shared goals that never touch your own progress.",
+};
+
+// Rendered per request, so the quote is different every time you land here.
+export const dynamic = "force-dynamic";
+
+const LOOP = ["Plan", "Do", "Log", "Measure", "Improve", "Return"];
+
+const SPEC: [string, string][] = [
+  ["Tracks", "DSA, SQL, ML, gym, diet, sleep, steps, or anything you name yourself"],
+  ["Daily bar", "Core tasks only. Bonus work earns XP and rescues nothing"],
+  ["Rank", `${TIERS.length} tiers, 0–3000 rating, recalculated from your logs`],
+  ["Analytics", "90-day heatmap, momentum, per-category averages, never estimated"],
+  ["Focus", "Timed sessions. XP per completed half hour, streak untouched"],
+  ["Recovery", "A three-day rebuild after a broken streak. No streak freezes"],
+  ["Together", "SYNC rooms with shared goals, individual targets, separate tables"],
+  ["Private", "Friends see rank and streak. Tasks and metrics stay yours"],
+];
+
+export default async function LandingPage() {
+  if (await getCurrentUser()) redirect("/dashboard");
+
+  const quotes = await db.quote.findMany({ select: { text: true, author: true } });
+  const quote = quotes.length ? quotes[Math.floor(Math.random() * quotes.length)] : null;
+
+  return (
+    <main className="min-h-dvh">
+      <Hero />
+
+      {/* A deliberately thin band — breaks the rhythm before the next big block. */}
+      <section className="border-b border-line px-5 py-4">
+        <ul className="font-data mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 text-[10px] tracking-[0.28em] text-faint">
+          <li>{TIERS.length} TIERS</li>
+          <li aria-hidden>·</li>
+          <li>±{RATING_RULES.ceiling} RATING PER DAY</li>
+          <li aria-hidden>·</li>
+          <li>{Math.round(RATING_RULES.expectation * 100)}% EXPECTATION LINE</li>
+          <li aria-hidden>·</li>
+          <li>{BACKFILL_DAYS}-DAY BACKFILL LIMIT</li>
+          <li aria-hidden>·</li>
+          <li>NO STREAK FREEZES</li>
+        </ul>
+      </section>
+
+      {/* ------------------------------------------------------------ loop */}
+      <section className="border-b border-line px-5 py-16">
+        <div className="mx-auto max-w-6xl">
+          <p className="font-data text-[10px] tracking-[0.32em] text-muted">THE ONLY LOOP</p>
+
+          <ol className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-3">
+            {LOOP.map((step, index) => (
+              <li key={step} className="flex items-baseline gap-4">
+                <span className="text-[clamp(1.5rem,4vw,2.75rem)] leading-none font-semibold tracking-[-0.035em]">
+                  {step}
+                </span>
+                {index < LOOP.length - 1 ? (
+                  <span className="font-data text-xl text-faint" aria-hidden>
+                    →
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+
+          <p className="mt-6 max-w-lg text-ink-soft">
+            Every screen serves one of these six. Nothing on the dashboard exists to be looked at.
+          </p>
+        </div>
+      </section>
+
+      {/* ----------------------------------------------------------- quote */}
+      {quote ? (
+        <section className="border-b border-line px-5 py-20 sm:py-28">
+          <figure className="mx-auto max-w-4xl">
+            <span aria-hidden className="block h-px w-16 bg-amber" />
+            <blockquote className="mt-8 text-[clamp(1.75rem,5vw,3.5rem)] leading-[1.06] font-semibold tracking-[-0.035em] text-ink">
+              {quote.text}
+            </blockquote>
+            {quote.author ? (
+              <figcaption className="font-data mt-6 text-[10px] tracking-[0.32em] text-amber">
+                {quote.author.toUpperCase()}
+              </figcaption>
+            ) : null}
+          </figure>
+        </section>
+      ) : null}
+
+      {/* ------------------------------------------------------------ sync */}
+      <section className="border-b border-line px-5 py-20 sm:py-24">
+        <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
+          <div>
+            <p className="font-data text-[10px] tracking-[0.32em] text-muted">SYNC</p>
+
+            <h2 className="mt-4 text-[clamp(2rem,6vw,3.75rem)] leading-[0.98] font-semibold tracking-[-0.04em]">
+              Let&apos;s grow
+              <br />
+              <span className="text-amber">together.</span>
+            </h2>
+
+            <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-soft">
+              Doing this alone is why it stops in week three. A SYNC is one goal, one room, and
+              everyone&apos;s progress in the open, including the days nobody showed up.
+            </p>
+
+            <dl className="mt-8 space-y-5">
+              {[
+                [
+                  "One goal, your own target",
+                  "Aim for 100 days while someone else aims for 60. Same direction, honest numbers.",
+                ],
+                [
+                  "Shared tasks, separate boxes",
+                  "Everyone gets their own row. You can never tick one for somebody else.",
+                ],
+                [
+                  "Visible, not exposed",
+                  "The room shows goal progress and rank. Your tasks, metrics and notes stay private.",
+                ],
+                [
+                  "Nothing is borrowed",
+                  "SYNC work lives in its own table, so group activity can never inflate your rank.",
+                ],
+              ].map(([title, body]) => (
+                <div key={title} className="border-l border-line pl-5">
+                  <dt className="font-medium text-ink">{title}</dt>
+                  <dd className="mt-1 text-sm leading-relaxed text-muted">{body}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <SyncPreview />
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------ math */}
+      <section className="border-b border-line px-5 py-20">
+        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1fr_1.15fr] lg:gap-16">
+          <div>
+            <p className="font-data text-[10px] tracking-[0.32em] text-muted">THE MATH, IN FULL</p>
+            <h2 className="mt-4 text-[clamp(1.75rem,5vw,3rem)] leading-[1.02] font-semibold tracking-[-0.035em]">
+              No hidden score.
+            </h2>
+            <p className="mt-5 max-w-sm leading-relaxed text-ink-soft">
+              Every number below is the constant the app actually uses. You should be able to
+              explain your own day without trusting us about it.
+            </p>
+          </div>
+
+          <dl className="font-data text-sm">
+            {[
+              ["Hold the line", `${Math.round(RATING_RULES.expectation * 100)}% of core tasks`],
+              ["Best possible day", `+${RATING_RULES.ceiling} before bonuses`],
+              ["Worst possible day", `${RATING_RULES.floor}`],
+              ["Perfect day", `+${RATING_RULES.perfectDay} rating · +${XP_RULES.perfectDay} XP`],
+              ["Step goal met", `+${RATING_RULES.stepGoal} rating`],
+              ["Wake goal met", `+${RATING_RULES.wakeGoal} rating`],
+              ["Long streak", `up to +${RATING_RULES.maxStreakBonus} per day`],
+              ["Bad day", "bonuses do not apply"],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="flex items-baseline justify-between gap-6 border-b border-line py-3.5"
+              >
+                <dt className="text-muted">{label}</dt>
+                <dd className="text-right text-ink-soft">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------ spec */}
+      <section className="border-b border-line px-5 py-20">
+        <div className="mx-auto max-w-6xl">
+          <p className="font-data text-[10px] tracking-[0.32em] text-muted">WHAT IT IS</p>
+
+          <dl className="mt-8">
+            {SPEC.map(([label, value], index) => (
+              <div
+                key={label}
+                className="grid grid-cols-[2rem_1fr] items-baseline gap-x-5 gap-y-1 border-t border-line py-4 sm:grid-cols-[2rem_11rem_1fr]"
+              >
+                <span className="font-data text-xs tabular-nums text-faint">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <dt className="font-medium text-ink">{label}</dt>
+                <dd className="col-span-2 text-sm leading-relaxed text-muted sm:col-span-1">
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------- cta */}
+      <section className="px-5 py-24 sm:py-32">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="text-[clamp(2rem,6vw,4rem)] leading-[0.98] font-semibold tracking-[-0.04em]">
+            Shared direction.
+            <br />
+            <span className="text-amber">Individual accountability.</span>
+          </h2>
+
+          <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-soft">
+            Start alone tonight. Bring people in when you want the pressure.
+          </p>
+
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Link
+              href="/register"
+              className="font-data rounded-md bg-amber px-6 py-3 text-sm text-void transition-colors hover:bg-amber-soft"
+            >
+              Create your account
+            </Link>
+            <Link
+              href="/login"
+              className="font-data rounded-md border border-line bg-raised px-6 py-3 text-sm text-ink-soft transition-colors hover:border-line-strong hover:text-ink"
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-line px-5 py-8">
+        <p className="font-data mx-auto max-w-6xl text-[10px] tracking-[0.28em] text-faint">
+          ~/CONSISTENCY
+        </p>
+      </footer>
+    </main>
+  );
+}
