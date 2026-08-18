@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArchiveRestore, ChevronDown, ChevronUp, Pencil, Trash2, X } from "lucide-react";
+import { ArchiveRestore, ChevronDown, ChevronUp, ExternalLink, Pencil, Trash2, X } from "lucide-react";
 
 import {
   archiveTaskAction,
@@ -11,7 +11,7 @@ import {
 } from "@/app/(app)/actions";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
-import { categoryLabel, CATEGORY_LABELS, DAY_TYPE_LABELS } from "@/lib/tasks";
+import { categoryLabel, CATEGORY_LABELS, DAY_TYPE_LABELS } from "@/lib/task-labels";
 import { cn } from "@/lib/utils";
 
 type Category = keyof typeof CATEGORY_LABELS;
@@ -24,6 +24,7 @@ export type ManagedTask = {
   customLabel: string | null;
   dayType: DayType;
   scheduledDate: string | null;
+  linkUrl: string | null;
   isCore: boolean;
   archived: boolean;
 };
@@ -196,7 +197,20 @@ function Group({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">{task.name}</p>
+                    <p className="flex items-center gap-1.5 truncate text-sm">
+                      {task.name}
+                      {task.linkUrl ? (
+                        <a
+                          href={task.linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Open the link for ${task.name}`}
+                          className="text-amber hover:text-amber-soft"
+                        >
+                          <ExternalLink size={12} />
+                        </a>
+                      ) : null}
+                    </p>
                     <p className="font-data text-[10px] tracking-widest text-faint">
                       {categoryLabel(task).toUpperCase()} ·{" "}
                       {task.dayType === "ONE_OFF" && task.scheduledDate
@@ -298,6 +312,13 @@ function EditRow({
         />
       ) : null}
 
+      <Input
+        value={draft.linkUrl ?? ""}
+        onChange={(e) => setDraft({ ...draft, linkUrl: e.target.value })}
+        placeholder="Link (optional): a LeetCode or Codeforces problem"
+        aria-label="Task link"
+      />
+
       {draft.category === "CUSTOM" ? (
         <Input
           value={draft.customLabel ?? ""}
@@ -332,6 +353,7 @@ function NewTaskForm({
     customLabel: "" as string,
     dayType: "DAILY" as DayType,
     scheduledDate: "" as string,
+    linkUrl: "" as string,
     isCore: true,
   });
 
@@ -407,6 +429,19 @@ function NewTaskForm({
           </select>
         </div>
 
+        <Field
+          label="LINK"
+          htmlFor="new-task-link"
+          hint="Optional. A LeetCode or Codeforces problem, a doc, anything."
+        >
+          <Input
+            id="new-task-link"
+            value={draft.linkUrl}
+            onChange={(e) => setDraft({ ...draft, linkUrl: e.target.value })}
+            placeholder="https://leetcode.com/problems/two-sum/"
+          />
+        </Field>
+
         {draft.dayType === "ONE_OFF" ? (
           <Field
             label="DATE"
@@ -452,6 +487,7 @@ function NewTaskForm({
               customLabel: "",
               dayType: "DAILY",
               scheduledDate: "",
+              linkUrl: "",
               isCore: true,
             });
             setOpen(false);

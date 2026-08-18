@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { endFocusAction, startFocusAction } from "@/app/(app)/focus/actions";
+import { FocusClock, type ClockStyle } from "@/components/focus-clock";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
-import { CATEGORY_LABELS } from "@/lib/tasks";
+import { CATEGORY_LABELS } from "@/lib/task-labels";
 
 type Option = { id: string; name: string; category: keyof typeof CATEGORY_LABELS };
 
@@ -29,6 +30,17 @@ export function FocusTimer({ tasks }: { tasks: Option[] }) {
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [clockStyle, setClockStyle] = useState<ClockStyle>("plain");
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("consistency:clock-style");
+    if (stored === "flip" || stored === "plain") setClockStyle(stored);
+  }, []);
+
+  function changeClockStyle(next: ClockStyle) {
+    setClockStyle(next);
+    window.localStorage.setItem("consistency:clock-style", next);
+  }
 
   const target = minutes * 60;
   const remaining = Math.max(0, target - elapsed);
@@ -99,23 +111,15 @@ export function FocusTimer({ tasks }: { tasks: Option[] }) {
 
   if (sessionId) {
     return (
-      <section className="card p-8 text-center">
-        <p className="font-data text-[11px] tracking-widest text-muted">
-          {label.toUpperCase()} · {minutes} MIN
-        </p>
-
-        <p className="font-data mt-6 text-5xl tracking-tight tabular-nums sm:text-6xl">
-          {clock(remaining)}
-        </p>
-
-        <div className="mx-auto mt-6 h-1 w-full max-w-xs overflow-hidden rounded-full bg-raised">
-          <div
-            className="h-full bg-amber transition-[width] duration-1000"
-            style={{ width: `${Math.min(100, (elapsed / target) * 100)}%` }}
-          />
-        </div>
-
-        <div className="mt-7 flex justify-center gap-2">
+      <FocusClock
+        remaining={remaining}
+        style={clockStyle}
+        onStyleChange={changeClockStyle}
+        label={label}
+        plannedMinutes={minutes}
+        progress={elapsed / target}
+      >
+        <div className="flex flex-wrap justify-center gap-2">
           <Button
             variant="ghost"
             size="sm"
@@ -142,7 +146,7 @@ export function FocusTimer({ tasks }: { tasks: Option[] }) {
         <p className="mt-4 text-xs text-faint">
           Leaving this page ends the timer without recording it.
         </p>
-      </section>
+      </FocusClock>
     );
   }
 
@@ -152,7 +156,11 @@ export function FocusTimer({ tasks }: { tasks: Option[] }) {
 
       <div className="mt-4 space-y-4">
         {tasks.length > 0 ? (
-          <Field label="TASK" htmlFor="focus-task">
+          <Field
+            label="TASK"
+            htmlFor="focus-task"
+            hint="Not listed? Pick 'Something else' and type your own name below."
+          >
             <select
               id="focus-task"
               className="font-data h-10 w-full rounded-md border border-line bg-void px-2 text-sm text-ink focus:border-amber focus:outline-none"
@@ -163,7 +171,7 @@ export function FocusTimer({ tasks }: { tasks: Option[] }) {
                 if (found) setLabel(found.name);
               }}
             >
-              <option value="">No specific task</option>
+              <option value="">Something else (type a name below)</option>
               {tasks.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -173,7 +181,11 @@ export function FocusTimer({ tasks }: { tasks: Option[] }) {
           </Field>
         ) : null}
 
-        <Field label="LABEL" htmlFor="focus-label">
+        <Field
+          label="LABEL"
+          htmlFor="focus-label"
+          hint="What this session is called in your history. Edit it freely."
+        >
           <Input
             id="focus-label"
             value={label}

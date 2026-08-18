@@ -4,13 +4,12 @@ import { dayKeyToDate, dateToDayKey, todayKey, type DayKey } from "@/lib/time";
 /**
  * Declared rest days, not streak freezes.
  *
- * The distinction the PRD cares about: scheduling Sunday off a week ahead is a
- * plan, and forgiving yesterday is an excuse. So a rest day must be declared at
- * least a full day ahead, and can never be applied retroactively.
+ * Today or any future day can be declared; the past cannot. That keeps the
+ * meaningful line intact: you can decide to take a day off, but you cannot
+ * reclassify a day you already lost.
  */
 
 export const REST_DAYS_PER_MONTH = 4;
-export const MIN_NOTICE_DAYS = 1;
 
 export function monthOf(key: DayKey) {
   return key.slice(0, 7); // yyyy-MM
@@ -51,12 +50,12 @@ export async function declareRestDay(
 ): Promise<DeclareResult> {
   const today = todayKey(timezone);
 
-  // Strictly ahead of time. Today and the past are both refused.
-  const earliest = dateToDayKey(new Date(dayKeyToDate(today).getTime() + MIN_NOTICE_DAYS * 86_400_000));
-  if (key < earliest) {
+  // Today or later. The past stays closed: a day that already happened cannot
+  // be reclassified after the fact, which is the whole point of the rule.
+  if (key < today) {
     return {
       ok: false,
-      error: "Rest days have to be declared at least a day ahead. Yesterday can't become one.",
+      error: "Yesterday can't become a rest day. Declare today or a day ahead.",
     };
   }
 
@@ -83,8 +82,8 @@ export async function cancelRestDay(
   const today = todayKey(timezone);
 
   // Cancelling a past rest day would rewrite history that already counted.
-  if (key <= today) {
-    return { ok: false, error: "That rest day has already started. It stays on the record." };
+  if (key < today) {
+    return { ok: false, error: "That rest day has passed. It stays on the record." };
   }
 
   await db.restDay.deleteMany({ where: { userId, date: dayKeyToDate(key) } });

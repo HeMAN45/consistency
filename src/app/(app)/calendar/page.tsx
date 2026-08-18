@@ -28,8 +28,8 @@ export default async function CalendarPage({
   ]);
 
   const isRestDay = rests.has(date);
-  // Declaring, or undoing, is only possible strictly ahead of time.
-  const canDeclareRest = date > today;
+  // Today or later. The past is closed.
+  const canDeclareRest = date >= today;
 
   const core = tasks.filter((t) => t.isCore);
   const coreDone = core.filter((t) => t.completed).length;
@@ -59,6 +59,7 @@ export default async function CalendarPage({
         canDeclareRest={canDeclareRest}
         restDaysUsed={restsUsed}
         restDaysPerMonth={REST_DAYS_PER_MONTH}
+        todayHint={today}
       />
 
       <p className="text-xs text-faint">

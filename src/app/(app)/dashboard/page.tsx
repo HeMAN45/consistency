@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ComebackBanner } from "@/components/comeback-banner";
+import { BehindSchedule } from "@/components/behind-schedule";
 import { GapsCard, type Gap } from "@/components/gaps-card";
+import { SharedToday } from "@/components/shared-today";
 import { DailyBattle } from "@/components/daily-battle";
 import { MetricsForm } from "@/components/metrics-form";
 import { RankBadge } from "@/components/rank-badge";
@@ -10,6 +12,8 @@ import { StatCard } from "@/components/stat-card";
 import { db } from "@/lib/db";
 import { consistencyScore, momentum } from "@/lib/rank";
 import { comebackState } from "@/lib/progression";
+import { sharedTasksForToday } from "@/lib/sync";
+import { watchSummary } from "@/lib/watch-progress";
 import { requireUser } from "@/lib/session";
 import { tasksForDay } from "@/lib/tasks";
 import { dayKeyToDate, formatDayKey, shiftDayKey, todayKey } from "@/lib/time";
@@ -20,7 +24,8 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const today = todayKey(user.timezone);
 
-  const [tasks, metric, snapshots, quotes, comeback, recentMetrics, rests] = await Promise.all([
+  const [tasks, metric, snapshots, quotes, comeback, recentMetrics, rests, playlists, sharedToday] =
+    await Promise.all([
     tasksForDay(user.id, today, user.timezone),
     db.dailyMetric.findUnique({
       where: { userId_date: { userId: user.id, date: dayKeyToDate(today) } },
@@ -39,6 +44,8 @@ export default async function DashboardPage() {
       where: { userId: user.id, date: { gte: dayKeyToDate(shiftDayKey(today, -7)) } },
       select: { date: true },
     }),
+    watchSummary(user.id, user.timezone),
+    sharedTasksForToday(user.id, user.timezone),
   ]);
 
   // Incomplete days inside the backfill window, excluding today and any day
@@ -117,6 +124,8 @@ export default async function DashboardPage() {
 
       {comeback ? <ComebackBanner state={comeback} /> : null}
 
+      <BehindSchedule playlists={playlists} />
+
       <DailyBattle
         dateKey={today}
         tasks={tasks.map((t) => ({
@@ -126,7 +135,8 @@ export default async function DashboardPage() {
           customLabel: t.customLabel,
           isCore: t.isCore,
           completed: t.completed,
-          evidenceUrl: t.evidenceUrl,
+          youtubeVideoId: t.youtubeVideoId,
+          linkUrl: t.linkUrl,
         }))}
       />
 
@@ -144,6 +154,8 @@ export default async function DashboardPage() {
           hint={`Last 7 days ${trend.recentPct}% · previous ${trend.previousPct}%`}
         />
       </div>
+
+      <SharedToday tasks={sharedToday} dateKey={today} />
 
       <GapsCard gaps={gaps} />
 

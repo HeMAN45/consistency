@@ -1,12 +1,13 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { Check, Link2 } from "lucide-react";
+import Link from "next/link";
+import { Check, ExternalLink, Play } from "lucide-react";
 
 import { toggleTaskAction, type ProgressEvents } from "@/app/(app)/actions";
 import { Celebration } from "@/components/celebration";
 import { enqueue, isOffline } from "@/lib/offline-queue";
-import { categoryLabel, CATEGORY_LABELS } from "@/lib/tasks";
+import { categoryLabel, CATEGORY_LABELS } from "@/lib/task-labels";
 import { cn } from "@/lib/utils";
 
 type BattleTask = {
@@ -16,7 +17,8 @@ type BattleTask = {
   customLabel: string | null;
   isCore: boolean;
   completed: boolean;
-  evidenceUrl: string | null;
+  youtubeVideoId: string | null;
+  linkUrl: string | null;
 };
 
 export function DailyBattle({ tasks, dateKey }: { tasks: BattleTask[]; dateKey: string }) {
@@ -105,13 +107,7 @@ export function DailyBattle({ tasks, dateKey }: { tasks: BattleTask[]; dateKey: 
 
       <ul className="mt-5 space-y-1">
         {core.map((task) => (
-          <TaskRow
-            key={task.id}
-            task={task}
-            dateKey={dateKey}
-            onToggle={() => toggle(task)}
-            onError={setError}
-          />
+          <TaskRow key={task.id} task={task} onToggle={() => toggle(task)} />
         ))}
       </ul>
 
@@ -120,14 +116,7 @@ export function DailyBattle({ tasks, dateKey }: { tasks: BattleTask[]; dateKey: 
           <p className="font-data mt-6 text-[11px] tracking-widest text-faint">BONUS</p>
           <ul className="mt-2 space-y-1">
             {bonus.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                dateKey={dateKey}
-                onToggle={() => toggle(task)}
-                onError={setError}
-                bonus
-              />
+              <TaskRow key={task.id} task={task} onToggle={() => toggle(task)} bonus />
             ))}
           </ul>
         </>
@@ -144,35 +133,13 @@ export function DailyBattle({ tasks, dateKey }: { tasks: BattleTask[]; dateKey: 
 
 function TaskRow({
   task,
-  dateKey,
   onToggle,
-  onError,
   bonus,
 }: {
   task: BattleTask;
-  dateKey: string;
   onToggle: () => void;
-  onError: (message: string | null) => void;
   bonus?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [url, setUrl] = useState(task.evidenceUrl ?? "");
-  const [, startTransition] = useTransition();
-
-  function saveEvidence() {
-    onError(null);
-    startTransition(async () => {
-      const result = await toggleTaskAction({
-        taskId: task.id,
-        date: dateKey,
-        completed: true,
-        evidenceUrl: url.trim() === "" ? null : url.trim(),
-      });
-      if (result.error) onError(result.error);
-      else setEditing(false);
-    });
-  }
-
   return (
     <li>
       <button
@@ -202,16 +169,16 @@ function TaskRow({
           {task.name}
         </span>
 
-        {task.evidenceUrl ? (
+        {task.linkUrl ? (
           <a
-            href={task.evidenceUrl}
+            href={task.linkUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(event) => event.stopPropagation()}
-            aria-label={`Open evidence for ${task.name}`}
+            aria-label={`Open the link for ${task.name}`}
             className="text-amber hover:text-amber-soft"
           >
-            <Link2 size={13} />
+            <ExternalLink size={13} />
           </a>
         ) : null}
 
@@ -220,45 +187,15 @@ function TaskRow({
         </span>
       </button>
 
-      {task.completed ? (
-        editing ? (
-          <div className="flex gap-2 py-1 pl-10">
-            <input
-              autoFocus
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") saveEvidence();
-                if (event.key === "Escape") setEditing(false);
-              }}
-              placeholder="https://leetcode.com/submissions/..."
-              className="font-data h-8 flex-1 rounded-md border border-line bg-void px-2 text-xs text-ink placeholder:text-faint focus:border-amber focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={saveEvidence}
-              className="font-data text-[10px] tracking-widest text-amber"
-            >
-              SAVE
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="font-data text-[10px] tracking-widest text-faint hover:text-ink"
-            >
-              CANCEL
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="font-data ml-10 py-0.5 text-[10px] tracking-widest text-faint hover:text-ink"
-          >
-            {task.evidenceUrl ? "EDIT PROOF" : "+ ADD PROOF"}
-          </button>
-        )
+      {task.youtubeVideoId && !task.completed ? (
+        <Link
+          href={`/watch/v/${task.youtubeVideoId}`}
+          className="font-data ml-10 flex items-center gap-1.5 py-0.5 text-[10px] tracking-widest text-amber hover:text-amber-soft"
+        >
+          <Play size={11} /> WATCH
+        </Link>
       ) : null}
+
     </li>
   );
 }

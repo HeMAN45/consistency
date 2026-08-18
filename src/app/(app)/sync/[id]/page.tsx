@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { SyncCourses } from "@/components/sync-courses";
+import { SyncLeaderboard } from "@/components/leaderboard";
 import { SeasonBanner } from "@/components/season-banner";
 import { SyncReviewCard } from "@/components/sync-review-card";
 import { SyncRoom } from "@/components/sync-room";
 import { requireUser } from "@/lib/session";
+import { syncLeaderboard } from "@/lib/leaderboard";
+import { listSyncPlaylists } from "@/lib/sync-playlists";
 import { loadSyncRoom } from "@/lib/sync";
 
 export const metadata: Metadata = { title: "SYNC Room · ~/consistency" };
@@ -17,6 +21,11 @@ export default async function SyncRoomPage({ params }: { params: Promise<{ id: s
   // Not a member? Indistinguishable from the SYNC not existing.
   const room = await loadSyncRoom(id, user.id, user.timezone);
   if (!room) notFound();
+
+  const [rankings, courses] = await Promise.all([
+    syncLeaderboard(id, user.id, user.timezone),
+    listSyncPlaylists(id, user.id),
+  ]);
 
   return (
     <div className="rise space-y-5">
@@ -39,6 +48,7 @@ export default async function SyncRoomPage({ params }: { params: Promise<{ id: s
           id: t.id,
           name: t.name,
           isCore: t.isCore,
+          linkUrl: t.linkUrl,
           canRemove: t.canRemove,
           completions: t.completions,
         }))}
@@ -48,6 +58,10 @@ export default async function SyncRoomPage({ params }: { params: Promise<{ id: s
         milestones={room.milestones}
         writable={room.writable}
       />
+
+      <SyncCourses syncId={id} courses={courses} />
+
+      <SyncLeaderboard rankings={rankings} />
 
       {room.review ? <SyncReviewCard review={room.review} /> : null}
     </div>

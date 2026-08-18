@@ -1,7 +1,7 @@
 {
   "name": "~/consistency",
   "short_name": "consistency",
-  "description": "A personal discipline operating system.",
+  "description": "Track your work, keep a rank you can lose, and grow with friends without borrowing their progress.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
@@ -20,8 +20,10 @@
     }
   ],
   "shortcuts": [
-    { "name": "Today", "url": "/dashboard" },
-    { "name": "Focus", "url": "/focus" },
-    { "name": "SYNC", "url": "/sync" }
-  ]
+    { "name": "Today", "short_name": "Today", "url": "/dashboard" },
+    { "name": "Problems", "short_name": "Problems", "url": "/problems" },
+    { "name": "Focus", "short_name": "Focus", "url": "/focus" },
+    { "name": "Chat", "short_name": "Chat", "url": "/chat" }
+  ],
+  "prefer_related_applications": false
 }

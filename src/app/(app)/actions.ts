@@ -145,8 +145,24 @@ export async function createTaskAction(input: unknown): Promise<ActionState> {
   const parsed = createTaskSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
 
-  const count = await db.task.count({ where: { ownerUserId: user.id, archivedAt: null } });
-  if (count >= 40) return { error: "40 active tasks is the limit. Archive something first." };
+  /*
+   * The cap exists to stop a runaway recurring task list, so it counts only
+   * recurring habits. One-off tasks, and the dated video tasks a playlist
+   * generates, are transient by nature: a 100-video course would otherwise eat
+   * the entire allowance and block you from adding a habit.
+   */
+  const count = await db.task.count({
+    where: {
+      ownerUserId: user.id,
+      archivedAt: null,
+      dayType: { not: "ONE_OFF" },
+      youtubeVideoId: null,
+    },
+  });
+
+  if (count >= 60) {
+    return { error: "60 recurring tasks is the limit. Archive one first." };
+  }
 
   const last = await db.task.findFirst({
     where: { ownerUserId: user.id },

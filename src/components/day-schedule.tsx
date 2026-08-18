@@ -22,6 +22,7 @@ type Props = {
   canDeclareRest: boolean;
   restDaysUsed: number;
   restDaysPerMonth: number;
+  todayHint: string;
 };
 
 const selectClass =
@@ -38,6 +39,7 @@ export function DaySchedule({
   canDeclareRest,
   restDaysUsed,
   restDaysPerMonth,
+  todayHint,
 }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -230,6 +232,7 @@ export function DaySchedule({
           <>
             <p className="mt-2 text-sm text-muted">
               Planning time off is discipline. Declare it and the day costs you nothing.
+              {dateKey === todayHint ? " Deciding this early beats deciding it at midnight." : ""}
             </p>
             <Button
               size="sm"
@@ -242,7 +245,7 @@ export function DaySchedule({
           </>
         ) : (
           <p className="mt-2 text-sm text-muted">
-            Rest days have to be declared at least a day ahead. Yesterday cannot become one.
+            This day has passed. A day you already lost cannot become a rest day.
           </p>
         )}
       </section>

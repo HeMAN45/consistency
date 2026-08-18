@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 
+import { FriendsLeaderboard } from "@/components/leaderboard";
 import { FriendsPanel } from "@/components/friends-panel";
 import { incomingRequests, listFriends, outgoingRequests } from "@/lib/friends";
+import { friendsLeaderboard } from "@/lib/leaderboard";
 import { requireUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Friends · ~/consistency" };
@@ -9,10 +11,11 @@ export const metadata: Metadata = { title: "Friends · ~/consistency" };
 export default async function FriendsPage() {
   const user = await requireUser();
 
-  const [friends, incoming, outgoing] = await Promise.all([
+  const [friends, incoming, outgoing, rankings] = await Promise.all([
     listFriends(user.id),
     incomingRequests(user.id),
     outgoingRequests(user.id),
+    friendsLeaderboard(user.id),
   ]);
 
   return (
@@ -23,6 +26,8 @@ export default async function FriendsPage() {
           Your accountability circle. Your data stays yours.
         </p>
       </header>
+
+      <FriendsLeaderboard rankings={rankings} />
 
       <FriendsPanel
         friends={friends.map((f) => ({

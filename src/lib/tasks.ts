@@ -40,25 +40,8 @@ export function allTasks(userId: string) {
   });
 }
 
-export const CATEGORY_LABELS: Record<Task["category"], string> = {
-  DSA: "DSA",
-  SQL: "SQL",
-  ML: "ML",
-  HEALTH: "Health",
-  CUSTOM: "Custom",
-};
-
-/** What the user sees for a category: their own word when they gave one. */
-export function categoryLabel(task: { category: Task["category"]; customLabel?: string | null }) {
-  return task.category === "CUSTOM" && task.customLabel
-    ? task.customLabel
-    : CATEGORY_LABELS[task.category];
-}
-
-export const DAY_TYPE_LABELS: Record<Task["dayType"], string> = {
-  DAILY: "Every day",
-  WEEKDAY: "Weekdays",
-  SATURDAY: "Saturdays",
-  SUNDAY: "Sundays",
-  ONE_OFF: "One day only",
-};
+export {
+  categoryLabel,
+  CATEGORY_LABELS,
+  DAY_TYPE_LABELS,
+} from "@/lib/task-labels";

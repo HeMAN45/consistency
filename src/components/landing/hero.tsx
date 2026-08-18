@@ -31,11 +31,11 @@ export function Hero() {
         style={{ background: "var(--accent)", opacity: 0.7 }}
       />
 
-      <div className="relative mx-auto grid max-w-6xl gap-12 px-5 pt-14 pb-16 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-16 lg:pt-20 lg:pb-24">
+      <div className="relative mx-auto grid max-w-6xl gap-10 px-5 pt-12 pb-14 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-14 lg:pt-16 lg:pb-16">
         <div>
           <CommandStrip />
 
-          <h1 className="mt-8 text-[clamp(3rem,9vw,6rem)] leading-[0.9] font-semibold tracking-[-0.045em]">
+          <h1 className="mt-6 text-[clamp(2.6rem,7.5vw,5rem)] leading-[0.92] font-semibold tracking-[-0.045em]">
             A rank
             <br />
             you can
@@ -45,13 +45,13 @@ export function Hero() {
             </span>
           </h1>
 
-          <p className="mt-8 max-w-md text-lg leading-relaxed text-ink-soft">
+          <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-soft">
             You already know what to do. The problem is doing it on the days you don&apos;t feel
             like it. This keeps score honestly, and lets the number fall when you don&apos;t show
             up.
           </p>
 
-          <div className="mt-9 flex flex-wrap gap-3">
+          <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href="/register"
               className="font-data rounded-md bg-amber px-6 py-3 text-sm text-void transition-colors hover:bg-amber-soft"
@@ -66,7 +66,7 @@ export function Hero() {
             </Link>
           </div>
 
-          <p className="mt-6 text-sm text-faint">
+          <p className="mt-5 text-sm text-faint">
             Drag the slider. The page takes the colour of the rank you&apos;d earn.
           </p>
         </div>

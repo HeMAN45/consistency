@@ -37,6 +37,89 @@
   --radius-card: 0.625rem;
 }
 
+/* ------------------------------------------------------------------ light */
+/*
+ * Light is not the dark palette inverted. Paper needs real white surfaces
+ * lifted off a warm ground, hairlines rather than heavy borders, and a much
+ * darker amber, because #FFB020 on white fails contrast badly.
+ */
+[data-theme="light"] {
+  /*
+   * Third pass. The previous version washed out because the ground and the
+   * cards were too close together and the muted text was too pale to read at
+   * 11px. Ground is warmer and darker, hairlines are stronger, and every text
+   * tone moved down a step.
+   */
+  --color-void: #edeae3;
+  --color-surface: #ffffff;
+  --color-raised: #e2ddd3;
+  --color-line: #d2cabb;
+  --color-line-strong: #9d9484;
+
+  --color-ink: #12100d;
+  --color-ink-soft: #2f2a23;
+  --color-muted: #524b41;
+  --color-faint: #776f61;
+
+  /* Amber at #ffb020 fails contrast on white. Dark enough to read as text,
+     still unmistakably amber rather than brown. */
+  --color-amber: #a8500a;
+  --color-amber-soft: #8a3f06;
+  --color-amber-dim: #f5e3c6;
+
+  --color-good: #11662a;
+  --color-warn: #6f4c00;
+  --color-bad: #99201a;
+
+  --color-rank-newbie: #4e5762;
+  --color-rank-pupil: #11662a;
+  --color-rank-specialist: #085f6d;
+  --color-rank-expert: #1740b8;
+  --color-rank-cm: #631aa8;
+  --color-rank-master: #9a3704;
+  --color-rank-gm: #99201a;
+}
+
+/* Borders alone read as flat on paper, so cards get a hairline plus lift. */
+[data-theme="light"] .card {
+  box-shadow:
+    0 1px 2px rgb(18 16 13 / 0.06),
+    0 2px 6px -2px rgb(18 16 13 / 0.04);
+}
+
+/* Filled controls stay bright: a dark amber block looks muddy. Bright amber
+   with near-black text mirrors the dark theme and keeps contrast high. */
+[data-theme="light"] .bg-amber {
+  background-color: #ef9d14;
+  color: #17130d;
+}
+
+[data-theme="light"] .bg-amber:hover {
+  background-color: #dc8c08;
+}
+
+/* Tinted fills need more presence on white than they do on near-black. */
+[data-theme="light"] .bg-amber\/10 { background-color: #fbeed6; }
+[data-theme="light"] .bg-amber\/15 { background-color: #f9e8c9; }
+[data-theme="light"] .bg-amber\/20 { background-color: #f7e1ba; }
+[data-theme="light"] .bg-amber\/25 { background-color: #f5daab; }
+[data-theme="light"] .bg-amber\/45 { background-color: #eebc6d; }
+[data-theme="light"] .bg-amber\/70 { background-color: #e8a52f; }
+
+[data-theme="light"] .bg-good\/15,
+[data-theme="light"] .bg-good\/20 { background-color: #d6ecdb; }
+[data-theme="light"] .bg-good\/40 { background-color: #97cda7; }
+
+/* The grid is decoration; on paper it needs to be almost invisible. */
+[data-theme="light"] .hairline-grid {
+  opacity: 0.35;
+}
+
+[data-theme="light"] ::selection {
+  background: #f3ddb2;
+  color: #12100d;
+}
+
 /* ------------------------------------------------------------------- base */
 @layer base {
   * {
@@ -45,6 +128,14 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  html[data-theme="light"] {
+    color-scheme: light;
   }
 
   body {
@@ -100,6 +191,12 @@
 @utility rank-glow {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--rank-color) 35%, transparent),
     0 0 32px -8px color-mix(in srgb, var(--rank-color) 55%, transparent);
+}
+
+[data-theme="light"] .rank-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rank-color) 45%, transparent),
+    0 2px 10px -4px color-mix(in srgb, var(--rank-color) 35%, transparent);
 }
 
 /* Terminal identity layer: a caret that idles, never a green screen. */

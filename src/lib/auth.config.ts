@@ -5,7 +5,16 @@ import type { NextAuthConfig } from "next-auth";
  * `src/proxy.ts` imports only this, so route gating stays lightweight.
  */
 export const authConfig = {
-  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 30 },
+  /*
+   * Seven days rather than thirty, refreshed each day you use it. A stolen
+   * session cookie is the realistic attack here, and a month-long window is a
+   * long time to hold one.
+   */
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
+  },
   pages: { signIn: "/login", error: "/login" },
   trustHost: true,
   providers: [],
@@ -19,6 +28,8 @@ export const authConfig = {
         pathname.startsWith("/register") ||
         pathname.startsWith("/forgot-password") ||
         pathname.startsWith("/reset-password") ||
+        // The service worker serves this when the network is gone, so it can
+        // never require a session check.
         pathname === "/offline";
 
       if (isPublic) return true;

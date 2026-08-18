@@ -18,13 +18,24 @@ export const createTaskSchema = z
     // Only meaningful for CUSTOM; ignored otherwise so stale text can't linger.
     customLabel: z.string().trim().max(24).nullable().optional(),
     dayType: dayType,
-    scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    // The form sends "" when no date applies, so accept it and normalise below.
+    scheduledDate: z
+      .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date"), z.literal("")])
+      .nullable()
+      .optional(),
+    // Optional reference: a LeetCode problem, a Codeforces question, a doc.
+    linkUrl: z
+      .union([z.url("Links have to start with http"), z.literal("")])
+      .nullable()
+      .optional(),
     isCore: z.boolean(),
   })
   .transform((task) => ({
     ...task,
     customLabel: task.category === "CUSTOM" ? (task.customLabel?.trim() || null) : null,
-    scheduledDate: task.dayType === "ONE_OFF" ? (task.scheduledDate ?? null) : null,
+    scheduledDate:
+      task.dayType === "ONE_OFF" && task.scheduledDate ? task.scheduledDate : null,
+    linkUrl: task.linkUrl ? task.linkUrl : null,
   }))
   .refine((task) => task.dayType !== "ONE_OFF" || Boolean(task.scheduledDate), {
     message: "Pick the date this one-off task belongs to",
@@ -37,13 +48,24 @@ export const updateTaskSchema = z
     category: taskCategory,
     customLabel: z.string().trim().max(24).nullable().optional(),
     dayType: dayType,
-    scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    // The form sends "" when no date applies, so accept it and normalise below.
+    scheduledDate: z
+      .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date"), z.literal("")])
+      .nullable()
+      .optional(),
+    // Optional reference: a LeetCode problem, a Codeforces question, a doc.
+    linkUrl: z
+      .union([z.url("Links have to start with http"), z.literal("")])
+      .nullable()
+      .optional(),
     isCore: z.boolean(),
   })
   .transform((task) => ({
     ...task,
     customLabel: task.category === "CUSTOM" ? (task.customLabel?.trim() || null) : null,
-    scheduledDate: task.dayType === "ONE_OFF" ? (task.scheduledDate ?? null) : null,
+    scheduledDate:
+      task.dayType === "ONE_OFF" && task.scheduledDate ? task.scheduledDate : null,
+    linkUrl: task.linkUrl ? task.linkUrl : null,
   }))
   .refine((task) => task.dayType !== "ONE_OFF" || Boolean(task.scheduledDate), {
     message: "Pick the date this one-off task belongs to",

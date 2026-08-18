@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { ExternalLink } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 export type ViewMember = {
@@ -13,6 +15,7 @@ export type ViewMember = {
 export type ViewTask = {
   id: string;
   name: string;
+  linkUrl: string | null;
   canRemove: boolean;
   completions: { userId: string; displayName: string; completed: boolean; isYou: boolean }[];
 };
@@ -130,6 +133,25 @@ function Ring({ done, total, you }: { done: number; total: number; you: boolean 
   );
 }
 
+/** The one control every view needs: open the thing the task points at. */
+function TaskLink({ task }: { task: ViewTask }) {
+  if (!task.linkUrl) return null;
+
+  return (
+    <a
+      href={task.linkUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      aria-label={`Open the link for ${task.name}`}
+      title="Open the problem"
+      className="shrink-0 text-amber hover:text-amber-soft"
+    >
+      <ExternalLink size={13} />
+    </a>
+  );
+}
+
 function relativeTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const minutes = Math.round(diff / 60_000);
@@ -145,6 +167,8 @@ function relativeTime(iso: string) {
 
 /** Today as a scoreboard. Members ranked by what they've actually cleared. */
 export function BoardView({ members, tasks, onToggle }: SharedViewProps) {
+  const withLinks = tasks.filter((task) => task.linkUrl);
+
   const rows = members
     .map((member) => {
       const done = tasks.filter(
@@ -155,6 +179,24 @@ export function BoardView({ members, tasks, onToggle }: SharedViewProps) {
     .sort((a, b) => b.done - a.done || a.member.displayName.localeCompare(b.member.displayName));
 
   return (
+    <>
+      {withLinks.length > 0 ? (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {withLinks.map((task) => (
+            <a
+              key={task.id}
+              href={task.linkUrl as string}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-data flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[11px] text-muted hover:border-amber hover:text-amber"
+            >
+              <ExternalLink size={11} />
+              {task.name}
+            </a>
+          ))}
+        </div>
+      ) : null}
+
     <ol className="space-y-2">
       {rows.map((row, index) => {
         const leading = index === 0 && row.done > 0;
@@ -221,6 +263,7 @@ export function BoardView({ members, tasks, onToggle }: SharedViewProps) {
         );
       })}
     </ol>
+    </>
   );
 }
 
@@ -272,26 +315,27 @@ export function PeopleView({ members, tasks, onToggle }: SharedViewProps) {
                           : "border-line-strong",
                       )}
                     />
-                    <span className={cn("text-xs", completed ? "text-faint" : "text-ink-soft")}>
+                    <span className={cn("truncate text-xs", completed ? "text-faint" : "text-ink-soft")}>
                       {task.name}
                     </span>
                   </span>
                 );
 
                 return (
-                  <li key={task.id}>
+                  <li key={task.id} className="flex items-center gap-2">
                     {member.isYou ? (
                       <button
                         type="button"
                         onClick={() => onToggle(task)}
                         aria-pressed={completed}
-                        className="w-full py-0.5 text-left"
+                        className="min-w-0 flex-1 py-0.5 text-left"
                       >
                         {row}
                       </button>
                     ) : (
-                      <span className="block py-0.5">{row}</span>
+                      <span className="block min-w-0 flex-1 py-0.5">{row}</span>
                     )}
+                    <TaskLink task={task} />
                   </li>
                 );
               })}
@@ -319,7 +363,10 @@ export function TasksView({ tasks, onToggle, onRemove }: SharedViewProps) {
           <div key={task.id} className="rounded-lg border border-line p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm">{task.name}</p>
+                <p className="flex items-center gap-1.5 text-sm">
+                  {task.name}
+                  <TaskLink task={task} />
+                </p>
                 <p
                   className={cn(
                     "font-data mt-0.5 text-[10px] tracking-widest",

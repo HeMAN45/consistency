@@ -3,17 +3,15 @@ import type { Metadata } from "next";
 import { FocusTimer } from "@/components/focus-timer";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { tasksForDay } from "@/lib/tasks";
-import { todayKey } from "@/lib/time";
+import { allTasks } from "@/lib/tasks";
 
 export const metadata: Metadata = { title: "Focus · ~/consistency" };
 
 export default async function FocusPage() {
   const user = await requireUser();
-  const today = todayKey(user.timezone);
 
   const [tasks, sessions] = await Promise.all([
-    tasksForDay(user.id, today, user.timezone),
+    allTasks(user.id),
     db.focusSession.findMany({
       where: { userId: user.id, endedAt: { not: null } },
       orderBy: { startedAt: "desc" },
@@ -35,7 +33,9 @@ export default async function FocusPage() {
       </header>
 
       <FocusTimer
-        tasks={tasks.map((t) => ({ id: t.id, name: t.name, category: t.category }))}
+        tasks={tasks
+          .filter((t) => !t.archivedAt && t.isActive)
+          .map((t) => ({ id: t.id, name: t.name, category: t.category }))}
       />
 
       <section className="card p-5">

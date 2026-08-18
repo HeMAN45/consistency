@@ -206,6 +206,7 @@ export async function loadSyncRoom(syncId: string, userId: string, timezone: str
       category: task.category,
       isCore: task.isCore,
       createdByUserId: task.createdByUserId,
+      linkUrl: task.linkUrl,
       canRemove: access.isOwner || task.createdByUserId === userId,
       completions: members.map((m) => ({
         userId: m.userId,
@@ -317,4 +318,93 @@ export async function refreshGoalProgress(syncId: string, userId: string) {
 
 export function todayKeyFor(timezone: string): DayKey {
   return todayKey(timezone);
+}
+
+
+export type SharedTodayTask = {
+  id: string;
+  name: string;
+  syncId: string;
+  syncName: string;
+  linkUrl: string | null;
+  completed: boolean;
+  doneCount: number;
+  memberCount: number;
+};
+
+/**
+ * Today's shared work across every SYNC you belong to, for the dashboard.
+ *
+ * It stays visually separate from personal tasks because it is separate in the
+ * engine: completing shared work never touches your personal rank.
+ */
+export async function sharedTasksForToday(
+  userId: string,
+  timezone: string,
+): Promise<SharedTodayTask[]> {
+  const today = todayKey(timezone);
+
+  const memberships = await db.syncMembership.findMany({
+    where: { userId, status: "ACCEPTED" },
+    select: { syncId: true },
+  });
+
+  const syncIds = memberships.map((membership) => membership.syncId);
+  if (syncIds.length === 0) return [];
+
+  const [tasks, logs, counts] = await Promise.all([
+    db.syncTask.findMany({
+      where: { syncId: { in: syncIds }, isActive: true, archivedAt: null },
+      select: {
+        id: true,
+        name: true,
+        dayType: true,
+        scheduledDate: true,
+        createdAt: true,
+        linkUrl: true,
+        syncId: true,
+        sync: { select: { name: true, archivedAt: true, endDate: true } },
+      },
+      orderBy: [{ isCore: "desc" }, { sortOrder: "asc" }],
+    }),
+    db.syncTaskLog.findMany({
+      where: { date: dayKeyToDate(today), syncTask: { syncId: { in: syncIds } } },
+      select: { syncTaskId: true, userId: true, completed: true },
+    }),
+    db.syncMembership.groupBy({
+      by: ["syncId"],
+      where: { syncId: { in: syncIds }, status: "ACCEPTED" },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const memberCounts = new Map(counts.map((row) => [row.syncId, row._count._all]));
+  const mine = new Set(
+    logs.filter((log) => log.userId === userId && log.completed).map((log) => log.syncTaskId),
+  );
+
+  const doneCounts = new Map<string, number>();
+  for (const log of logs) {
+    if (!log.completed) continue;
+    doneCounts.set(log.syncTaskId, (doneCounts.get(log.syncTaskId) ?? 0) + 1);
+  }
+
+  return tasks
+    .filter((task) => {
+      if (task.sync.archivedAt) return false;
+      // A closed season is a record, not a to-do list.
+      if (task.sync.endDate && dateToDayKey(task.sync.endDate) < today) return false;
+      if (dateToDayKey(task.createdAt) > today) return false;
+      return taskAppliesOn(task, today);
+    })
+    .map((task) => ({
+      id: task.id,
+      name: task.name,
+      syncId: task.syncId,
+      syncName: task.sync.name,
+      linkUrl: task.linkUrl,
+      completed: mine.has(task.id),
+      doneCount: doneCounts.get(task.id) ?? 0,
+      memberCount: memberCounts.get(task.syncId) ?? 1,
+    }));
 }

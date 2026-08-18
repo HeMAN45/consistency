@@ -119,7 +119,10 @@ const createSyncSchema = z.object({
   name: z.string().trim().min(1, "Name the SYNC").max(48),
   goalTitle: z.string().trim().min(1, "Give it a shared goal").max(60),
   target: z.number().int().min(1).max(1000),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  endDate: z
+    .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")])
+    .nullable()
+    .optional(),
   inviteUserIds: z.array(z.string()).max(20),
 });
 
@@ -301,7 +304,10 @@ const createSyncTaskSchema = z
     name: z.string().trim().min(1, "Name the task").max(60),
     category: taskCategory,
     dayType,
-    scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    scheduledDate: z
+      .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date"), z.literal("")])
+      .nullable()
+      .optional(),
     isCore: z.boolean(),
   })
   .refine((task) => task.dayType !== "ONE_OFF" || Boolean(task.scheduledDate), {
@@ -333,12 +339,14 @@ export async function createSyncTaskAction(input: unknown): Promise<SocialState>
     select: { sortOrder: true },
   });
 
-  const { scheduledDate, ...taskData } = parsed.data;
+  const { scheduledDate, linkUrl, ...taskData } = parsed.data;
+  const oneOffDate = scheduledDate ? scheduledDate : null;
 
   await db.syncTask.create({
     data: {
       ...taskData,
-      scheduledDate: scheduledDate ? dayKeyToDate(scheduledDate) : null,
+      scheduledDate: oneOffDate ? dayKeyToDate(oneOffDate) : null,
+      linkUrl: linkUrl ? linkUrl : null,
       createdByUserId: user.id,
       sortOrder: (last?.sortOrder ?? 0) + 1,
     },

@@ -68,6 +68,27 @@ enum RankTier {
   GRANDMASTER
 }
 
+enum Platform {
+  LEETCODE
+  CODEFORCES
+  GEEKSFORGEEKS
+  HACKERRANK
+  CODECHEF
+  ATCODER
+  OTHER
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum PlaylistKind {
+  PLAYLIST
+  SINGLE
+}
+
 enum ScheduleSource {
   INTERNAL
   IMPORTED
@@ -148,6 +169,15 @@ model User {
   calendarLinks     CalendarConnection[]
   resetTokens       PasswordResetToken[]
   restDays          RestDay[]
+  playlists         YoutubePlaylist[]
+  watchProgress     WatchProgress[]
+  problems          Problem[]
+  linksSent         SharedLink[]         @relation("LinkFrom")
+  linksReceived     SharedLink[]         @relation("LinkTo")
+  messagesSent      Message[]            @relation("MessageAuthor")
+  messagesReceived  Message[]            @relation("MessageRecipient")
+  chatReads         ChatRead[]           @relation("ChatReader")
+  chatReadPeers     ChatRead[]           @relation("ChatPeer")
 
   @@index([lastActiveAt])
 }
@@ -163,6 +193,12 @@ model Task {
   dayType         DayType      @default(DAILY)
   /// Set only for ONE_OFF tasks: the single local day they apply to.
   scheduledDate   DateTime?    @db.Date
+  /// Set when this task is "watch this video".
+  youtubeVideoId  String?
+  /// Optional reference: a LeetCode problem, a Codeforces question, a doc.
+  linkUrl         String?
+  /// Set when this task is "solve this problem".
+  problemId       String?
   ownerUserId     String
   createdByUserId String
   isCore          Boolean      @default(true)
@@ -171,6 +207,8 @@ model Task {
   createdAt       DateTime     @default(now())
   archivedAt      DateTime? // archive, never hard delete
 
+  video     YoutubeVideo?  @relation(fields: [youtubeVideoId], references: [id], onDelete: SetNull)
+  problem   Problem?       @relation(fields: [problemId], references: [id], onDelete: SetNull)
   owner     User           @relation("TaskOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   createdBy User           @relation("TaskAuthor", fields: [createdByUserId], references: [id])
   logs      TaskLog[]
@@ -369,6 +407,167 @@ model RestDay {
   @@index([userId, date])
 }
 
+/// A YouTube playlist, or a single video stored as a one-item playlist so the
+/// rest of the system only has one shape to deal with. Metadata only: titles,
+/// ids and durations. Nothing is downloaded.
+model YoutubePlaylist {
+  id           String       @id @default(cuid())
+  youtubeId    String
+  kind         PlaylistKind @default(PLAYLIST)
+  title        String
+  channelTitle String?
+  thumbnailUrl String?
+
+  /// Exactly one of these is set: a personal playlist or a SYNC playlist.
+  ownerUserId String?
+  syncId      String?
+
+  /// Planning. Pace is videos per day; the finish date is derived, never stored,
+  /// so it stays honest when you fall behind.
+  videosPerDay Int      @default(2)
+  startDate    DateTime? @db.Date
+  isCore       Boolean  @default(true)
+  /// SYNC only: one schedule for everyone, or each member at their own pace.
+  sharedSchedule Boolean @default(false)
+
+  fetchedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  owner  User? @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sync   Sync? @relation(fields: [syncId], references: [id], onDelete: Cascade)
+  videos YoutubeVideo[]
+
+  @@unique([ownerUserId, youtubeId])
+  @@unique([syncId, youtubeId])
+  @@index([ownerUserId])
+}
+
+model YoutubeVideo {
+  id              String  @id @default(cuid())
+  playlistId      String
+  youtubeId       String
+  title           String
+  position        Int
+  durationSeconds Int     @default(0)
+  thumbnailUrl    String?
+  /// False for deleted or privated videos. Kept in place so totals do not
+  /// silently drift, and shown struck through rather than vanishing.
+  available       Boolean @default(true)
+
+  playlist  YoutubePlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+  syncTasks SyncTask[]
+  progress  WatchProgress[]
+
+  @@unique([playlistId, youtubeId])
+  @@index([playlistId, position])
+}
+
+/// Accumulated watch time, per user per video. Scrubbing to the end does not
+/// count: only seconds actually played are added.
+model WatchProgress {
+  id             String    @id @default(cuid())
+  userId         String
+  videoId        String
+  watchedSeconds Int       @default(0)
+  completedAt    DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video YoutubeVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+  @@index([userId])
+}
+
+/// A practice problem: a link, where it came from, and optionally how hard it
+/// was and what it was about. Solving is recorded through the task system, so a
+/// problem solved alone and one solved inside a SYNC count the same.
+model Problem {
+  id         String      @id @default(cuid())
+  url        String
+  platform   Platform    @default(OTHER)
+  title      String
+  difficulty Difficulty?
+  /// Free-form topics: arrays, dp, graphs. Lowercased on the way in.
+  topics     String[]    @default([])
+
+  ownerUserId String?
+  syncId      String?
+
+  createdAt DateTime @default(now())
+
+  owner     User?      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sync      Sync?      @relation(fields: [syncId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+  syncTasks SyncTask[]
+
+  @@unique([ownerUserId, url])
+  @@unique([syncId, url])
+  @@index([ownerUserId, platform])
+}
+
+/// A link passed to a friend. Deliberately not a chat: one link, one optional
+/// line, no thread. It creates no task and changes no score, because passing
+/// something along is not the same as doing it.
+model SharedLink {
+  id         String    @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  url        String
+  title      String
+  note       String?
+  createdAt  DateTime  @default(now())
+  seenAt     DateTime?
+
+  from User @relation("LinkFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to   User @relation("LinkTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([toUserId, createdAt])
+  @@index([fromUserId, createdAt])
+}
+
+/// A message, either direct to one friend or to everyone in a SYNC.
+/// Exactly one of recipientId and syncId is set.
+model Message {
+  id       String @id @default(cuid())
+  authorId String
+  body     String
+
+  recipientId String?
+  syncId      String?
+
+  /// The first link found in the body, described once on the way in so the
+  /// thread does not re-parse it on every render.
+  url       String?
+  linkTitle String?
+
+  createdAt DateTime @default(now())
+
+  author    User  @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  recipient User? @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sync      Sync? @relation(fields: [syncId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, authorId, createdAt])
+  @@index([syncId, createdAt])
+}
+
+/// Where each person has read up to, per conversation. One row per thread.
+model ChatRead {
+  id         String   @id @default(cuid())
+  userId     String
+  peerId     String?
+  syncId     String?
+  lastReadAt DateTime @default(now())
+
+  user User  @relation("ChatReader", fields: [userId], references: [id], onDelete: Cascade)
+  peer User? @relation("ChatPeer", fields: [peerId], references: [id], onDelete: Cascade)
+  sync Sync? @relation(fields: [syncId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, peerId])
+  @@unique([userId, syncId])
+}
+
 model Quote {
   id       String  @id @default(cuid())
   text     String
@@ -410,6 +609,10 @@ model Sync {
   tasks      SyncTask[]
   nudges     Nudge[]
   milestones SyncMilestone[]
+  playlists  YoutubePlaylist[]
+  problems   Problem[]
+  messages   Message[]
+  chatReads  ChatRead[]
 
   @@index([ownerUserId])
 }
@@ -504,6 +707,9 @@ model SyncTask {
   customLabel     String?
   dayType         DayType      @default(DAILY)
   scheduledDate   DateTime?    @db.Date
+  youtubeVideoId  String?
+  linkUrl         String?
+  problemId       String?
   syncId          String
   createdByUserId String
   isCore          Boolean      @default(true)
@@ -513,6 +719,8 @@ model SyncTask {
   archivedAt      DateTime?
 
   sync      Sync          @relation(fields: [syncId], references: [id], onDelete: Cascade)
+  video     YoutubeVideo? @relation(fields: [youtubeVideoId], references: [id], onDelete: SetNull)
+  problem   Problem?      @relation(fields: [problemId], references: [id], onDelete: SetNull)
   createdBy User          @relation(fields: [createdByUserId], references: [id])
   logs      SyncTaskLog[]
 

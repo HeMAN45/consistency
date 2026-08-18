@@ -329,3 +329,103 @@ export function buildWeeklyReview(bundle: AnalyticsBundle, timezone: string): We
     focus,
   };
 }
+
+
+// ------------------------------------------------------- year heatmap
+
+export type YearDay = {
+  date: DayKey;
+  completionPct: number;
+  coreCompleted: number;
+  coreTotal: number;
+  perfectDay: boolean;
+  steps: number | null;
+  wakeTime: string | null;
+  restDay: boolean;
+  hasData: boolean;
+  inFuture: boolean;
+};
+
+export type YearHeatmap = {
+  year: number;
+  days: YearDay[];
+  availableYears: number[];
+  totals: { tracked: number; perfect: number; rest: number; averagePct: number };
+};
+
+/** Every day of a calendar year, whether or not anything was logged. */
+export async function loadYearHeatmap(
+  user: { id: string; timezone: string; createdAt: Date },
+  year: number,
+): Promise<YearHeatmap> {
+  const today = todayKey(user.timezone);
+  const currentYear = Number(today.slice(0, 4));
+  const firstYear = Number(dateToDayKey(user.createdAt).slice(0, 4));
+
+  const availableYears: number[] = [];
+  for (let y = currentYear; y >= Math.min(firstYear, currentYear); y--) availableYears.push(y);
+
+  const from = `${year}-01-01`;
+  const to = `${year}-12-31`;
+
+  const [snapshots, metrics, rests] = await Promise.all([
+    db.dailySnapshot.findMany({
+      where: {
+        userId: user.id,
+        date: { gte: dayKeyToDate(from), lte: dayKeyToDate(to) },
+      },
+    }),
+    db.dailyMetric.findMany({
+      where: {
+        userId: user.id,
+        date: { gte: dayKeyToDate(from), lte: dayKeyToDate(to) },
+      },
+      select: { date: true, steps: true, wakeTime: true },
+    }),
+    db.restDay.findMany({
+      where: {
+        userId: user.id,
+        date: { gte: dayKeyToDate(from), lte: dayKeyToDate(to) },
+      },
+      select: { date: true },
+    }),
+  ]);
+
+  const snapshotByDay = new Map(snapshots.map((s) => [dateToDayKey(s.date), s]));
+  const metricByDay = new Map(metrics.map((m) => [dateToDayKey(m.date), m]));
+  const restKeys = new Set(rests.map((r) => dateToDayKey(r.date)));
+
+  const days: YearDay[] = dayKeyRange(from, to).map((date) => {
+    const snapshot = snapshotByDay.get(date);
+    const metric = metricByDay.get(date);
+
+    return {
+      date,
+      completionPct: snapshot?.completionPct ?? 0,
+      coreCompleted: snapshot?.coreCompleted ?? 0,
+      coreTotal: snapshot?.coreTotal ?? 0,
+      perfectDay: snapshot?.perfectDay ?? false,
+      steps: metric?.steps ?? null,
+      wakeTime: metric?.wakeTime ?? null,
+      restDay: restKeys.has(date),
+      hasData: Boolean(snapshot && snapshot.coreTotal > 0),
+      inFuture: date > today,
+    };
+  });
+
+  const tracked = days.filter((d) => d.hasData);
+
+  return {
+    year,
+    days,
+    availableYears,
+    totals: {
+      tracked: tracked.length,
+      perfect: days.filter((d) => d.perfectDay).length,
+      rest: days.filter((d) => d.restDay).length,
+      averagePct: tracked.length
+        ? Math.round((tracked.reduce((sum, d) => sum + d.completionPct, 0) / tracked.length) * 100)
+        : 0,
+    },
+  };
+}

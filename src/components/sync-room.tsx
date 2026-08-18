@@ -50,6 +50,7 @@ type SharedTask = {
   id: string;
   name: string;
   isCore: boolean;
+  linkUrl: string | null;
   canRemove: boolean;
   completions: { userId: string; displayName: string; completed: boolean; isYou: boolean }[];
 };
@@ -81,6 +82,7 @@ export function SyncRoom(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [newTask, setNewTask] = useState("");
   const [newTaskDate, setNewTaskDate] = useState("");
+  const [newTaskLink, setNewTaskLink] = useState("");
   const [view, setView] = useStoredView();
   const [inviteName, setInviteName] = useState("");
   const [, startTransition] = useTransition();
@@ -361,16 +363,24 @@ export function SyncRoom(props: Props) {
                   category: "CUSTOM",
                   dayType: newTaskDate ? "ONE_OFF" : "DAILY",
                   scheduledDate: newTaskDate || null,
+                  linkUrl: newTaskLink || null,
                   isCore: true,
                 }),
               );
               setNewTask("");
               setNewTaskDate("");
+              setNewTaskLink("");
             }}
           >
             Add
           </Button>
         </div>
+
+        <Input
+          value={newTaskLink}
+          onChange={(e) => setNewTaskLink(e.target.value)}
+          placeholder="Link (optional): a LeetCode or Codeforces problem"
+        />
 
         <div className="flex items-center gap-2">
           <label htmlFor="sync-task-date" className="font-data text-[10px] tracking-widest text-faint">

@@ -7,7 +7,7 @@
  * app owns that, because only it knows what a duplicate would mean.
  */
 
-const VERSION = "v1";
+const VERSION = "v5";
 const SHELL = `shell-${VERSION}`;
 const PAGES = `pages-${VERSION}`;
 
@@ -36,12 +36,21 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
+  // Dev servers reuse chunk URLs, so caching them would serve stale code.
+  // Belt and braces: the app also refuses to register this worker outside
+  // production.
+  if (self.location.hostname === "localhost" || self.location.hostname === "127.0.0.1") return;
+
   // Only GETs are ever cached. Mutations belong to the app's own queue.
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
+
+  // Conversations go stale in seconds. Showing an old thread from cache would
+  // be worse than showing the offline page.
+  if (url.pathname.startsWith("/chat")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(
@@ -59,7 +68,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/_next/static") || url.pathname.startsWith("/icons/")) {
+  // Audio loops are large and never change once added, so they are worth
+  // holding on to for offline use.
+  if (
+    url.pathname.startsWith("/_next/static") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/sounds/")
+  ) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>

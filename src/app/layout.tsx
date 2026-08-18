@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -34,9 +35,24 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const THEME_COOKIE = "consistency-theme";
+
+/**
+ * The theme lives in a cookie so the server can put `data-theme` on <html>
+ * directly. That kills three problems at once: no flash of the wrong palette,
+ * no inline script (React 19 refuses to render one inside a component), and no
+ * hand-written <head> (which breaks next/font injection).
+ */
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const store = await cookies();
+  const theme = store.get(THEME_COOKIE)?.value === "light" ? "light" : "dark";
+
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrains.variable}`}>
+    <html
+      lang="en"
+      data-theme={theme}
+      className={`${inter.variable} ${jetbrains.variable}`}
+    >
       <body>{children}</body>
     </html>
   );

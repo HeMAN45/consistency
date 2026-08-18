@@ -1,19 +1,40 @@
 import type { Metadata } from "next";
 
 import { StepsChart, WakeChart, WeeklyTrendChart } from "@/components/charts";
-import { Heatmap } from "@/components/heatmap";
+import { ProblemAnalytics } from "@/components/problem-analytics";
+import { WatchAnalytics } from "@/components/watch-analytics";
+import { YearHeatmapGrid } from "@/components/year-heatmap";
 import { StatCard } from "@/components/stat-card";
-import { buildWeeklyReview, loadAnalytics } from "@/lib/analytics";
+import { buildWeeklyReview, loadAnalytics, loadYearHeatmap } from "@/lib/analytics";
 import { db } from "@/lib/db";
 import { TIERS, tierFor } from "@/lib/rank";
 import { requireUser } from "@/lib/session";
-import { formatDayKey } from "@/lib/time";
+import { problemStats } from "@/lib/problems";
+import { watchSummary } from "@/lib/watch-progress";
+import { formatDayKey, todayKey } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Analytics · ~/consistency" };
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string }>;
+}) {
   const user = await requireUser();
-  const bundle = await loadAnalytics(user);
+  const params = await searchParams;
+
+  const currentYear = Number(todayKey(user.timezone).slice(0, 4));
+  const requested = Number(params.year);
+  const year = Number.isInteger(requested) && requested > 2000 && requested <= currentYear
+    ? requested
+    : currentYear;
+
+  const [bundle, yearHeatmap, playlists, problems] = await Promise.all([
+    loadAnalytics(user),
+    loadYearHeatmap(user, year),
+    watchSummary(user.id, user.timezone),
+    problemStats(user.id, user.timezone),
+  ]);
   const review = buildWeeklyReview(bundle, user.timezone);
 
   const rankHistory = await db.rankHistory.findMany({
@@ -74,7 +95,11 @@ export default async function AnalyticsPage() {
         />
       </div>
 
-      <Heatmap days={bundle.heatmap} />
+      <YearHeatmapGrid data={yearHeatmap} />
+
+      <ProblemAnalytics stats={problems} />
+
+      <WatchAnalytics playlists={playlists} />
 
       <section className="card p-5">
         <p className="font-data text-[11px] tracking-widest text-muted">WHAT THE DATA SAYS</p>

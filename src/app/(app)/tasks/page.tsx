@@ -17,6 +17,7 @@ export default async function TasksPage() {
     customLabel: t.customLabel,
     dayType: t.dayType,
     scheduledDate: t.scheduledDate ? t.scheduledDate.toISOString().slice(0, 10) : null,
+    linkUrl: t.linkUrl,
     isCore: t.isCore,
     archived: Boolean(t.archivedAt),
   }));

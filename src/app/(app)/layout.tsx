@@ -1,16 +1,22 @@
 import Link from "next/link";
 
 import { MobileNav, SideNav } from "@/components/app-nav";
+import { AmbientPlayer } from "@/components/ambient-player";
 import { CommandPalette } from "@/components/command-palette";
 import { OfflineSync } from "@/components/offline-sync";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { RankBadge } from "@/components/rank-badge";
 import { SignOutButton } from "@/components/sign-out-button";
+import { unreadTotal } from "@/lib/chat";
 import { pendingRequestCount } from "@/lib/friends";
 import { requireUser } from "@/lib/session";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const pendingRequests = await pendingRequestCount(user.id);
+  const [pendingRequests, unreadMessages] = await Promise.all([
+    pendingRequestCount(user.id),
+    unreadTotal(user.id),
+  ]);
 
   return (
     <div className="min-h-dvh md:flex">
@@ -28,12 +34,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
 
         <div className="mt-6 flex-1">
-          <SideNav pendingRequests={pendingRequests} />
+          <SideNav pendingRequests={pendingRequests} unreadMessages={unreadMessages} />
         </div>
 
         <p className="font-data px-3 pb-2 text-[10px] tracking-widest text-faint">
           CTRL K FOR COMMANDS
         </p>
+
+        <div className="flex items-center gap-1.5 px-3 pb-3">
+          <AmbientPlayer />
+          <ThemeToggle />
+        </div>
 
         <div className="border-t border-line px-3 pt-4">
           <p className="truncate text-sm text-ink-soft">{user.displayName}</p>
@@ -50,7 +61,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="text-amber">~/</span>
             <span className="text-ink">consistency</span>
           </Link>
-          <RankBadge rating={user.rating} />
+          <div className="flex items-center gap-2">
+            <AmbientPlayer />
+            <RankBadge rating={user.rating} />
+          </div>
         </header>
 
         <main
@@ -62,7 +76,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </main>
       </div>
 
-      <MobileNav />
+      <MobileNav pendingRequests={pendingRequests} unreadMessages={unreadMessages} />
       <CommandPalette timezone={user.timezone} />
       <OfflineSync />
     </div>

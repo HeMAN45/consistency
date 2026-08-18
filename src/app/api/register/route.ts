@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 
 import { registerSchema } from "@/lib/validation/auth";
 import { createUser } from "@/lib/users";
+import { clientAddress, isRateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (await isRateLimited("register", clientAddress(request), 5, 60)) {
+    return NextResponse.json({ error: "Too many accounts from here. Try later." }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
