@@ -7,8 +7,13 @@ export const usernameSchema = z
   .toLowerCase()
   .min(3, "Username needs at least 3 characters")
   .max(24, "Username can be at most 24 characters")
-  .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers and underscores only");
+  .regex(/^[a-z0-9_.-]+$/, "Letters, numbers, dots, hyphens and underscores");
 
+/**
+ * Length is the only rule. Character-class requirements push people toward
+ * "Password1!" and away from a long passphrase, which is the weaker of the two.
+ * Anything you can type is accepted: capitals, symbols, spaces, emoji.
+ */
 export const passwordSchema = z
   .string()
   .min(8, "Password needs at least 8 characters")

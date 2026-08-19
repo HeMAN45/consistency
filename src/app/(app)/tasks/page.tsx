@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { TaskManager, type ManagedTask } from "@/components/task-manager";
+import { TaskStarters } from "@/components/task-starters";
 import { requireUser } from "@/lib/session";
 import { allTasks } from "@/lib/tasks";
 
@@ -32,6 +33,8 @@ export default async function TasksPage() {
       </header>
 
       <TaskManager tasks={managed} />
+
+      {managed.filter((task) => !task.archived).length === 0 ? <TaskStarters /> : null}
     </div>
   );
 }

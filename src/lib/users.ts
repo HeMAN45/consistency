@@ -2,7 +2,6 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
-import { defaultTasksFor } from "@/lib/default-tasks";
 import type { RegisterInput } from "@/lib/validation/auth";
 
 export type CreateUserResult =
@@ -14,20 +13,20 @@ export async function createUser(input: RegisterInput): Promise<CreateUserResult
   const passwordHash = await bcrypt.hash(input.password, 12);
 
   try {
-    const user = await db.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          username: input.username,
-          displayName: input.displayName,
-          passwordHash,
-          email: input.email ? input.email : null,
-          timezone: input.timezone,
-        },
-        select: { id: true, username: true },
-      });
-
-      await tx.task.createMany({ data: defaultTasksFor(created.id) });
-      return created;
+    /*
+     * No starter tasks. A seeded list is somebody else's routine wearing your
+     * name, and the first thing most people do is delete it. The Tasks screen
+     * offers suggestions instead, which you choose rather than inherit.
+     */
+    const user = await db.user.create({
+      data: {
+        username: input.username,
+        displayName: input.displayName,
+        passwordHash,
+        email: input.email ? input.email : null,
+        timezone: input.timezone,
+      },
+      select: { id: true, username: true },
     });
 
     return { ok: true, id: user.id, username: user.username };

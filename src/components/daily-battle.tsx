@@ -123,9 +123,19 @@ export function DailyBattle({ tasks, dateKey }: { tasks: BattleTask[]; dateKey: 
       ) : null}
 
       {optimistic.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">
-          Nothing scheduled today. Add something on the Tasks screen.
-        </p>
+        <div className="mt-4">
+          <p className="text-sm text-ink">Nothing scheduled today.</p>
+          <p className="mt-1 text-sm text-muted">
+            Your rank only moves once there is something to finish. Two or three tasks is a real
+            start; ten is a wish list.
+          </p>
+          <Link
+            href="/tasks"
+            className="font-data mt-4 inline-block rounded-md bg-amber px-4 py-2 text-sm text-void hover:bg-amber-soft"
+          >
+            Add your first tasks
+          </Link>
+        </div>
       ) : null}
     </section>
   );

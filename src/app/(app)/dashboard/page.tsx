@@ -155,6 +155,48 @@ export default async function DashboardPage() {
         />
       </div>
 
+      {tasks.length === 0 ? (
+        <section className="card p-5">
+          <p className="font-data text-[11px] tracking-widest text-amber">FIRST THINGS</p>
+          <h2 className="mt-2 text-lg font-semibold tracking-[-0.02em]">
+            Nothing is tracked until you say what counts.
+          </h2>
+
+          <ol className="mt-4 space-y-3 text-sm">
+            <li className="flex gap-3">
+              <span className="font-data text-faint">01</span>
+              <span className="text-muted">
+                <Link href="/tasks" className="text-amber hover:text-amber-soft">
+                  Add a few core tasks
+                </Link>{" "}
+                — the work that decides whether a day counted. There are suggestions if you want
+                them.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="font-data text-faint">02</span>
+              <span className="text-muted">
+                Set your timezone, step goal and wake goal in{" "}
+                <Link href="/settings" className="text-amber hover:text-amber-soft">
+                  Settings
+                </Link>
+                . Everything daily depends on the timezone.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="font-data text-faint">03</span>
+              <span className="text-muted">
+                Finish them today. Your rating moves tonight, and the streak starts at one.
+              </span>
+            </li>
+          </ol>
+
+          <p className="mt-4 text-xs text-faint">
+            Optional from there: paste problems, import a course, or start a SYNC with a friend.
+          </p>
+        </section>
+      ) : null}
+
       <SharedToday tasks={sharedToday} dateKey={today} />
 
       <GapsCard gaps={gaps} />
