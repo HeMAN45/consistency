@@ -44,8 +44,8 @@ export async function addProblemsAction(input: unknown): Promise<ProblemState> {
   revalidatePath("/dashboard");
   if (parsed.data.syncId) revalidatePath(`/sync/${parsed.data.syncId}`);
 
-  const added = "added" in result ? result.added : 0;
-  const skipped = "skipped" in result ? result.skipped : 0;
+  const added = "added" in result ? (result.added ?? 0) : 0;
+  const skipped = "skipped" in result ? (result.skipped ?? 0) : 0;
 
   return {
     ok: true,

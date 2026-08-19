@@ -308,6 +308,11 @@ const createSyncTaskSchema = z
       .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date"), z.literal("")])
       .nullable()
       .optional(),
+    // Optional reference: a LeetCode problem, a Codeforces question, a doc.
+    linkUrl: z
+      .union([z.url("Links have to start with http"), z.literal("")])
+      .nullable()
+      .optional(),
     isCore: z.boolean(),
   })
   .refine((task) => task.dayType !== "ONE_OFF" || Boolean(task.scheduledDate), {

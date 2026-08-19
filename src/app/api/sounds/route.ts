@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { NextResponse } from "next/server";
 
-import { LAYERS } from "@/lib/ambient-layers";
+import { LAYERS, type LayerId } from "@/lib/ambient-layers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export async function GET() {
       );
 
       return match ? { id: layer.id, url: `/sounds/${encodeURIComponent(match)}` } : null;
-    }).filter((entry): entry is { id: string; url: string } => entry !== null);
+    }).filter((entry): entry is { id: LayerId; url: string } => entry !== null);
 
     return NextResponse.json({ sounds: found });
   } catch {

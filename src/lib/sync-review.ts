@@ -149,7 +149,7 @@ export async function weeklySyncReview(
     const done = mine.filter((s) => s.done).length;
     return {
       userId: member.userId,
-      displayName: member.displayName,
+      displayName: member.user.displayName,
       done,
       total: mine.length,
       pct: mine.length === 0 ? 0 : done / mine.length,
@@ -162,7 +162,7 @@ export async function weeklySyncReview(
     const before = ratio(previous.filter((s) => s.userId === member.userId));
     const delta = Math.round((now - before) * 100);
     if (delta > 0 && (!mostImproved || delta > mostImproved.deltaPoints)) {
-      mostImproved = { displayName: member.displayName, deltaPoints: delta };
+      mostImproved = { displayName: member.user.displayName, deltaPoints: delta };
     }
   }
 
@@ -208,7 +208,7 @@ export async function seasonSummary(syncId: string, timezone: string) {
       const mine = slots.filter((s) => s.userId === member.userId);
       const done = mine.filter((s) => s.done).length;
       return {
-        displayName: member.displayName,
+        displayName: member.user.displayName,
         done,
         total: mine.length,
         pct: mine.length === 0 ? 0 : done / mine.length,
