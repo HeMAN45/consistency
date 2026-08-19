@@ -7,7 +7,25 @@ import { signIn } from "@/lib/auth";
 import { createUser } from "@/lib/users";
 import { loginSchema, registerSchema } from "@/lib/validation/auth";
 
-export type FormState = { error?: string };
+export type FormState = {
+  error?: string;
+  /** Keyed by field name, so each message appears under the input it concerns. */
+  fieldErrors?: Record<string, string>;
+};
+
+/**
+ * First message per field, which is all a form ever needs to show.
+ * Typed loosely on purpose: Zod's issue array is readonly and its path element
+ * type has changed between versions.
+ */
+function byField(issues: readonly { readonly path: readonly PropertyKey[]; message: string }[]) {
+  const errors: Record<string, string> = {};
+  for (const issue of issues) {
+    const field = String(issue.path[0] ?? "");
+    if (field && !errors[field]) errors[field] = issue.message;
+  }
+  return errors;
+}
 
 export async function loginAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = loginSchema.safeParse({
@@ -16,7 +34,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check your details." };
+    return { fieldErrors: byField(parsed.error.issues) };
   }
 
   try {
@@ -42,7 +60,7 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { fieldErrors: byField(parsed.error.issues) };
   }
 
   const result = await createUser(parsed.data);

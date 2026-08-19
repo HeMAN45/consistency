@@ -14,7 +14,7 @@ export default async function RegisterPage() {
     <div className="card p-6">
       <h1 className="font-data text-xl tracking-tight">Create account</h1>
       <p className="mt-1 text-sm text-muted">
-        Starts you at Newbie, with a default task set you can edit right away.
+        Starts you at Newbie with an empty board. You decide what counts.
       </p>
 
       <RegisterForm />
