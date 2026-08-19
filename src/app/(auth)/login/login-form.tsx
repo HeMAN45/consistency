@@ -21,35 +21,17 @@ export function LoginForm() {
 
   return (
     <form action={action} className="mt-6 space-y-4">
-      <Field
-        label="USERNAME"
-        htmlFor="username"
-        hint={state.fieldErrors?.username}
-        error={Boolean(state.fieldErrors?.username)}
-      >
-        <Input
-          id="username"
-          name="username"
-          autoComplete="username"
-          autoFocus
-          required
-          aria-invalid={Boolean(state.fieldErrors?.username)}
-        />
+      <Field label="USERNAME" htmlFor="username">
+        <Input id="username" name="username" autoComplete="username" autoFocus required />
       </Field>
 
-      <Field
-        label="PASSWORD"
-        htmlFor="password"
-        hint={state.fieldErrors?.password}
-        error={Boolean(state.fieldErrors?.password)}
-      >
+      <Field label="PASSWORD" htmlFor="password">
         <Input
           id="password"
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          aria-invalid={Boolean(state.fieldErrors?.password)}
         />
       </Field>
 
